@@ -7,24 +7,70 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = '~/Google Drive/TUM Session/Semester One/Data Visualisation in R/')
+
 ```
 
-## R Markdown
+### Getting Data 
+```{r echo=FALSE, include=FALSE}
+library(data.table)
+library(magrittr)
+library(ggplot2)
+library(reshape)
+```
+```{r echo=TRUE}
+genotype_file <- 'Data/eqtl/genotype.txt'
+growth_file <- 'Data/eqtl/growth.txt'
+genotype <- as.data.table(read.delim(genotype_file))
+growth <- as.data.table(read.delim(growth_file))
+```
+### Checking the integrity of the data in both of the tables
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+```{r echo=TRUE}
+## Genotype Data
+names <- c("strain")
+for(i in 1:1000)
+{
+  names <- c(names, paste("mrk", i, sep = "_"))
+}
+colnames(genotype) <- names
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+### Calculating the proportion of Wild Isolate and Lab Strain
+genotype[, labProp := apply(genotype, MARGIN = 1, FUN = function(row) mean(grepl(unname(unlist(row)), pattern = 'Lab strain')))]
 
-```{r cars}
-summary(cars)
+genotype[, wildProp := apply(genotype, MARGIN = 1, FUN = function(row) mean(grepl(unname(unlist(row)), pattern = 'Wild isolate')))]
+
+## Growth Data
+
+### Checking the column class
+sapply(growth, class)
+
+### Melting the data to make it tidy
+growth_melt <- melt(growth, id.vars = 'strain', variable.name = 'env', value.name = 'rate')
+
+### Plotting boxplots to recognize any outliers
+ggplot(growth_melt, aes(env, rate)) + geom_boxplot() + theme_minimal() +
+  labs(title = "Visualisation of Growth Data") +
+  xlab("Environment") +
+  ylab("Rate of Growth")
+
 ```
 
-## Including Plots
+### Getting insight into how proportion of each parent strain effects the growth
+We investigate how the proportion of parent strain (from Wild Isolate and Lab Strain) is responsible for effecting the growth in a particular medium.
 
-You can also embed plots, for example:
+```{r echo=TRUE}
+## Merging the two datasets on the basis of segregants
+growth_geno <- merge(genotype[, c(1, 1002, 1003)], growth)
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+## Melting the merged table
+growth_geno_melt <- melt(growth_geno, id.vars = c('strain', 'labProp', 'wildProp'), variable.name = 'env', value.name = 'rate')
+
+## PLotting the data points as barplot distributed over environments
+ggplot(growth_geno_melt, aes(x = wildProp, y=rate)) + geom_point() + theme_minimal() +
+  facet_wrap(~env)
+
+ggplot(growth_geno_melt, aes(x = labProp, y=rate)) + geom_point() + theme_minimal() +
+  facet_wrap(~env)
+
 ```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
