@@ -7,7 +7,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-knitr::opts_knit$set(root.dir = 'C:\\Users\\Swaraj\\Documents\\TUM\\Data Analysis and Visualisation in R')
+knitr::opts_knit$set(root.dir = '~/Google Drive/TUM Session/Semester One/Data Visualisation in R/')
 
 ```
 
@@ -63,19 +63,33 @@ We investigate how the proportion of parent strain (from Wild Isolate and Lab St
 ```{r echo=TRUE}
 ## Merging the two datasets on the basis of segregants
 growth_geno <- merge(genotype[, c(1, 1002, 1003)], growth)
-geno_growth <- merge(genotype_melt, growth)
+
 ## Melting the merged table
 growth_geno_melt <- melt(growth_geno, id.vars = c('strain', 'labProp', 'wildProp'), variable.name = 'env', value.name = 'rate')
-geno_growth_melt <- melt(geno_growth, id.vars = c("strain","marker","genotype"), variable.name = "env", value.name = "rate")
 
-## PLotting the data points as barplot distributed over environments
+## PLotting the data points as scatterplots distributed over environments
 ggplot(growth_geno_melt, aes(x = wildProp, y=rate)) + geom_point() + theme_minimal() +
   facet_wrap(~env)
 
 ggplot(growth_geno_melt, aes(x = labProp, y=rate)) + geom_point() + theme_minimal() +
   facet_wrap(~env)
-## An insight into growth in different strains segregated by genotype (Lab Strain or Wild Isolate)
 
-ggplot(geno_growth_melt, aes(x = marker, y=rate, color=genotype)) + geom_point() + theme_minimal() +facet_wrap(~env)
+## Growth and Marker plots
+
+### Merging growth and genotype data with markers
+growth_marker <- merge(genotype, growth)
+growth_marker_melt <- melt(growth_marker, id.vars = colnames(growth_marker)[1:1003], variable.name = "env", value.name="rate")
+
+### Melting the markers in one column to make data tidy
+growth_marker_melt <- melt(growth_marker_melt, id.vars = c("strain", "env", "rate", "labProp", "wildProp"), variable.name = "marker_number", value.name = "parent_strain")
+
+### Cleaning the marker number column
+growth_marker_melt[, marker_number := as.integer(gsub("mrk_", "", marker_number))]
+
+### Plotting marker number with the mean of the rate in each of those markers
+growth_marker_melt[, mean_growth_per_marker := mean(rate, na.rm = T), by=marker_number]
+
+ggplot(growth_marker_melt, aes(x = marker_number, y=mean_growth_per_marker)) +  geom_line()+ theme_minimal() + facet_wrap(~env) +
+  labs(title = "Variation of growth with the marker") + xlab("Marker Number") + ylab("Rate of Growth")
 
 ```
