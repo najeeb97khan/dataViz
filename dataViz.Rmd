@@ -7,14 +7,14 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-knitr::opts_knit$set(root.dir = '~/Google Drive/TUM Session/Semester One/Data Visualisation in R/')
+knitr::opts_knit$set(root.dir = 'C:\\Users\\Swaraj\\Documents\\TUM\\Data Analysis and Visualisation in R')
 
 ```
 
 ### Getting Data 
 ```{r echo=FALSE, include=FALSE}
 library(data.table)
-library(magrittr)
+library(knitr)
 library(ggplot2)
 library(reshape)
 ```
@@ -47,7 +47,8 @@ sapply(growth, class)
 
 ### Melting the data to make it tidy
 growth_melt <- melt(growth, id.vars = 'strain', variable.name = 'env', value.name = 'rate')
-
+genotype_melt <- melt(genotype, id.vars = 'strain', variable.name = 'marker', value.name = 'genotype')
+genotype_melt[,marker:=gsub("mrk_","",marker)]
 ### Plotting boxplots to recognize any outliers
 ggplot(growth_melt, aes(env, rate)) + geom_boxplot() + theme_minimal() +
   labs(title = "Visualisation of Growth Data") +
@@ -62,9 +63,10 @@ We investigate how the proportion of parent strain (from Wild Isolate and Lab St
 ```{r echo=TRUE}
 ## Merging the two datasets on the basis of segregants
 growth_geno <- merge(genotype[, c(1, 1002, 1003)], growth)
-
+geno_growth <- merge(genotype_melt, growth)
 ## Melting the merged table
 growth_geno_melt <- melt(growth_geno, id.vars = c('strain', 'labProp', 'wildProp'), variable.name = 'env', value.name = 'rate')
+geno_growth_melt <- melt(geno_growth, id.vars = c("strain","marker","genotype"), variable.name = "env", value.name = "rate")
 
 ## PLotting the data points as barplot distributed over environments
 ggplot(growth_geno_melt, aes(x = wildProp, y=rate)) + geom_point() + theme_minimal() +
@@ -72,5 +74,8 @@ ggplot(growth_geno_melt, aes(x = wildProp, y=rate)) + geom_point() + theme_minim
 
 ggplot(growth_geno_melt, aes(x = labProp, y=rate)) + geom_point() + theme_minimal() +
   facet_wrap(~env)
+## An insight into growth in different strains segregated by genotype (Lab Strain or Wild Isolate)
+
+ggplot(geno_growth_melt, aes(x = marker, y=rate, color=genotype)) + geom_point() + theme_minimal() +facet_wrap(~env)
 
 ```
