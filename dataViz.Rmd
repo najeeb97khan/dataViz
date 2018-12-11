@@ -17,6 +17,7 @@ library(data.table)
 library(knitr)
 library(ggplot2)
 library(reshape)
+library(readxl)
 ```
 ```{r echo=TRUE}
 genotype_file <- 'Data/eqtl/genotype.txt'
@@ -74,6 +75,9 @@ ggplot(growth_geno_melt, aes(x = wildProp, y=rate)) + geom_point() + theme_minim
 ggplot(growth_geno_melt, aes(x = labProp, y=rate)) + geom_point() + theme_minimal() +
   facet_wrap(~env)
 
+## PLotting the data points as a single scatterplot
+ggplot(growth_geno_melt, aes(x = wildProp, y = rate, color=env)) + geom_point() + theme_minimal()
+
 ## Growth and Marker plots
 
 ### Merging growth and genotype data with markers
@@ -91,5 +95,24 @@ growth_marker_melt[, mean_growth_per_marker := mean(rate, na.rm = T), by=marker_
 
 ggplot(growth_marker_melt, aes(x = marker_number, y=mean_growth_per_marker)) +  geom_line()+ theme_minimal() + facet_wrap(~env) +
   labs(title = "Variation of growth with the marker") + xlab("Marker Number") + ylab("Rate of Growth")
+
+### They will be a straightline because for each segregant there is a single growth => for all 1000 markers there is only a single growth 
+
+```
+
+### Getting insight into how the gene expression is affected by the environment
+
+```{r echo=True}
+### Getting the gene expression  and gene data as they are connected
+gene_expression_file <- 'Data/eqtl/expression.txt'
+gene_expression <- as.data.table(read.table(gene_expression_file), keep.rownames = T)
+colnames(gene_expression) <- as.character(gene_expression[1, ])
+unname(gene_expression)
+
+gene_file <- 'Data/eqtl/gene.txt'
+gene_data <- read.csv(gene_file, sep = '\t')
+
+### Merging expression and gene data
+gene_expression_merge <- merge(gene_expression, gene_data)
 
 ```
