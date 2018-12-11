@@ -43,11 +43,10 @@ expression_tidy <- as.data.table(separate(as.data.frame(expression_tidy), medium
 #tidied version of expression data
 head(expression_tidy)
 ```
-#Analysis
-
 ### Getting Data 
 
 ```{r echo=TRUE}
+#TODO: Can you tidy the code here please?
 genotype_file <-'Data/eqtl/genotype.txt'
 growth_file <- 'Data/eqtl/growth.txt'
 genotype <- as.data.table(read.delim(genotype_file))
@@ -76,6 +75,9 @@ sapply(growth, class)
 ### Melting the data to make it tidy
 growth_melt <- melt(growth, id.vars = 'strain', variable.name = 'env', value.name = 'rate')
 ```
+
+
+#Analysis
 
 ### Effect of Environment on Growth
 We investigate how the environment affect growth rate of the segregants.
