@@ -1,23 +1,27 @@
 ---
 title: "dataViz"
-author: "Najeeb Khan, Hafik Arhan, Swaraj Oturkar, Elif Erbil"
+author: "Najeeb Khan, Hafik Arhan Kama??, Swaraj Oturkar, Elif Erbil"
 date: "12/4/2018"
 output: html_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-knitr::opts_knit$set(root.dir = '~/Google Drive/TUM Session/Semester One/Data Visualisation in R/')
+#knitr::opts_knit$set(root.dir = '~/Google Drive/TUM Session/Semester One/Data Visualisation in R/')
 
 ```
 
 ### Getting Data 
 ```{r echo=FALSE, include=FALSE}
 library(data.table)
-library(knitr)
+library(magrittr)
 library(ggplot2)
 library(reshape)
+<<<<<<< HEAD
 library(readxl)
+=======
+library(tidyr)
+>>>>>>> 7b041f9bac6123d96f3a9cf2be6e814225fced3d
 ```
 ```{r echo=TRUE}
 genotype_file <- 'Data/eqtl/genotype.txt'
@@ -48,8 +52,7 @@ sapply(growth, class)
 
 ### Melting the data to make it tidy
 growth_melt <- melt(growth, id.vars = 'strain', variable.name = 'env', value.name = 'rate')
-genotype_melt <- melt(genotype, id.vars = 'strain', variable.name = 'marker', value.name = 'genotype')
-genotype_melt[,marker:=gsub("mrk_","",marker)]
+
 ### Plotting boxplots to recognize any outliers
 ggplot(growth_melt, aes(env, rate)) + geom_boxplot() + theme_minimal() +
   labs(title = "Visualisation of Growth Data") +
@@ -68,13 +71,14 @@ growth_geno <- merge(genotype[, c(1, 1002, 1003)], growth)
 ## Melting the merged table
 growth_geno_melt <- melt(growth_geno, id.vars = c('strain', 'labProp', 'wildProp'), variable.name = 'env', value.name = 'rate')
 
-## PLotting the data points as scatterplots distributed over environments
+## PLotting the data points as barplot distributed over environments
 ggplot(growth_geno_melt, aes(x = wildProp, y=rate)) + geom_point() + theme_minimal() +
   facet_wrap(~env)
 
 ggplot(growth_geno_melt, aes(x = labProp, y=rate)) + geom_point() + theme_minimal() +
   facet_wrap(~env)
 
+<<<<<<< HEAD
 ## PLotting the data points as a single scatterplot
 ggplot(growth_geno_melt, aes(x = wildProp, y = rate, color=env)) + geom_point() + theme_minimal()
 
@@ -92,10 +96,14 @@ growth_marker_melt[, marker_number := as.integer(gsub("mrk_", "", marker_number)
 
 ### Plotting marker number with the mean of the rate in each of those markers
 growth_marker_melt[, mean_growth_per_marker := mean(rate, na.rm = T), by=marker_number]
+=======
+```
+>>>>>>> 7b041f9bac6123d96f3a9cf2be6e814225fced3d
 
-ggplot(growth_marker_melt, aes(x = marker_number, y=mean_growth_per_marker)) +  geom_line()+ theme_minimal() + facet_wrap(~env) +
-  labs(title = "Variation of growth with the marker") + xlab("Marker Number") + ylab("Rate of Growth")
+### Getting insight into how genes are expressed on different environments
+We investigate how the expression rate of each gene and gene type varies in different environments. 
 
+<<<<<<< HEAD
 ### They will be a straightline because for each segregant there is a single growth => for all 1000 markers there is only a single growth 
 
 ```
@@ -115,4 +123,50 @@ gene_data <- read.csv(gene_file, sep = '\t')
 ### Merging expression and gene data
 gene_expression_merge <- merge(gene_expression, gene_data)
 
+=======
+```{r echo=TRUE}
+gene_file <- 'Data/eqtl/gene.txt'
+expression_file <- 'Data/eqtl/expression.txt'
+gene <- as.data.table(read.delim(gene_file))
+expression <- as.data.table(read.delim(expression_file, comment.char = "#"))
+summary(gene)
+summary(expression)
+expression[, gene := gene$name]
+expression[, gene_type := gene$type]
+summary(expression)
+head(gene, n = 20)
+
+head(expression, n = 20)
+head(genotype$strain, n = 20)
+
+expression_tidy <- gather(expression, medium_strand, expression_rate, c("YPD.seg_01B":"YPMalt.seg_45C"))
+expression_tidy <- as.data.table(expression_tidy)
+expression_tidy[, medium_strand := .(gsub("_", "", medium_strand))]
+head(expression_tidy, n = 10)
+expression_tidy <- as.data.table(separate(as.data.frame(expression_tidy), medium_strand, into = c("medium", "strand")))
+expression_tidy
+
+gene_expr <- unique(expression_tidy[, mean_expr := .SD[, mean(expression_rate)], by = c("gene","medium")])
+
+#expression rates in each medium
+YDP_expr <- unique(expression_tidy[medium == "YPD", .SD[,.(medium, mean(expression_rate))], by = gene])
+YDPBPS_expr <-unique(expression_tidy[medium == "YPDBPS", .SD[,.(medium, mean(expression_rate))], by = gene])
+YDPRapa_expr <- unique(expression_tidy[medium == "YPDRapa", .SD[,.(medium, mean(expression_rate))], by = gene])
+YPE_expr <- unique(expression_tidy[medium == "YPE", .SD[,.(medium, mean(expression_rate))], by = gene])
+YPMalt_expr <- unique(expression_tidy[medium == "YPMalt", .SD[,.(medium, mean(expression_rate))], by = gene])
+
+ggplot(YDP_expr, aes(gene, V2)) + geom_point()
+ggplot(YDPBPS_expr, aes(gene, V2)) + geom_point()
+ggplot(YDPRapa_expr, aes(gene, V2)) + geom_point()
+ggplot(YPE_expr, aes(gene, V2)) + geom_point()
+ggplot(YPMalt_expr, aes(gene, V2)) + geom_point()
+
+#average expression of each gene in each medium in one graph
+mean_expr_dt <- unique(gene_expr[,.(medium, mean_expr, gene_type), by=gene])
+ggplot(mean_expr_dt[1:50], aes(gene, mean_expr)) + geom_point(aes(color = medium))
+ggplot(mean_expr_dt[1:50], aes(gene, 2^mean_expr)) + geom_point(aes(color = medium))
+
+#Average expression of each gene type in each environment
+ggplot(mean_expr_dt, aes(gene_type,2^mean_expr)) + geom_boxplot() + facet_wrap(~medium)
+>>>>>>> 7b041f9bac6123d96f3a9cf2be6e814225fced3d
 ```
