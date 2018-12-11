@@ -23,8 +23,14 @@ library(tidyr)
 ```{r echo=TRUE}
 genotype_file <- 'Data/eqtl/genotype.txt'
 growth_file <- 'Data/eqtl/growth.txt'
+gene_file <- 'Data/eqtl/gene.txt'
+marker_file <- 'Data/eqtl/marker.txt'
+
 genotype <- as.data.table(read.delim(genotype_file))
 growth <- as.data.table(read.delim(growth_file))
+gene <- as.data.table(read.delim(gene_file))
+marker <- as.data.table(read.delim(marker_file))
+
 ```
 ### Checking the integrity of the data in both of the tables
 
@@ -64,9 +70,18 @@ We investigate how the proportion of parent strain (from Wild Isolate and Lab St
 ```{r echo=TRUE}
 ## Merging the two datasets on the basis of segregants
 growth_geno <- merge(genotype[, c(1, 1002, 1003)], growth)
+geno_growth <- merge(genotype_melt, growth)
+gene_marker <- merge(marker,gene,by = "chrom",allow.cartesian = T)
+setnames(gene_marker,"start.x", "marker_start")
+setnames(gene_marker,"start.y", "gene_start")
+setnames(gene_marker,"end.x", "marker_end")
+setnames(gene_marker,"end.y", "gene_end")
 
 ## Melting the merged table
 growth_geno_melt <- melt(growth_geno, id.vars = c('strain', 'labProp', 'wildProp'), variable.name = 'env', value.name = 'rate')
+
+##Finding those markers which are on gene either completely or partially
+gene_marker_filtered <- subset(gene_marker,!(marker_start>gene_end | marker_end < gene_start))
 
 ## PLotting the data points as barplot distributed over environments
 ggplot(growth_geno_melt, aes(x = wildProp, y=rate)) + geom_point() + theme_minimal() +
