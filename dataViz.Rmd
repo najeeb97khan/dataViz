@@ -7,7 +7,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-#knitr::opts_knit$set(root.dir = '~/Google Drive/TUM Session/Semester One/Data Visualisation in R/')
+knitr::opts_knit$set(root.dir = '~/Google Drive/TUM Session/Semester One/Data Visualisation in R/')
 
 ```
 
@@ -36,12 +36,12 @@ marker <- as.data.table(read.delim(marker_file))
 
 ```{r echo=TRUE}
 ## Genotype Data
-names <- c("strain")
-for(i in 1:1000)
-{
-  names <- c(names, paste("mrk", i, sep = "_"))
-}
-colnames(genotype) <- names
+#### names <- c("strain")
+#### for(i in 1:1000)
+#### {
+####  names <- c(names, paste("mrk", i, sep = "_"))
+#### }
+#### colnames(genotype) <- names
 
 ### Calculating the proportion of Wild Isolate and Lab Strain
 genotype[, labProp := apply(genotype, MARGIN = 1, FUN = function(row) mean(grepl(unname(unlist(row)), pattern = 'Lab strain')))]
@@ -70,7 +70,7 @@ We investigate how the proportion of parent strain (from Wild Isolate and Lab St
 ```{r echo=TRUE}
 ## Merging the two datasets on the basis of segregants
 growth_geno <- merge(genotype[, c(1, 1002, 1003)], growth)
-geno_growth <- merge(genotype_melt, growth)
+
 gene_marker <- merge(marker,gene,by = "chrom",allow.cartesian = T)
 setnames(gene_marker,"start.x", "marker_start")
 setnames(gene_marker,"start.y", "gene_start")
@@ -81,7 +81,29 @@ setnames(gene_marker,"end.y", "gene_end")
 growth_geno_melt <- melt(growth_geno, id.vars = c('strain', 'labProp', 'wildProp'), variable.name = 'env', value.name = 'rate')
 
 ##Finding those markers which are on gene either completely or partially
-gene_marker_filtered <- subset(gene_marker,!(marker_start>gene_end | marker_end < gene_start))
+gene_marker_filtered <- subset(gene_marker,!(marker_start > gene_end | marker_end < gene_start))
+
+## TODO: Find the type of strain on each of the genes that are expressed through the marker
+colnames(genotype)
+
+genotype_melt <- melt(genotype, id.vars="strain", variable.name = "id", value.name = "parent_strain")
+
+new_table <- merge(x = genotype_melt, y = gene_marker_filtered, by = "id", allow.cartesian = T)
+subset_new_table <- new_table[, .(id, strain, parent_strain)]
+subset_new_table <- unique(subset_new_table)
+
+casted <- dcast(subset_new_table, ... ~ id, value.var =  "parent_strain")
+
+casted[, wildProp := apply(casted, MARGIN = 1, FUN = function(row) mean(grepl(unname(unlist(row)), pattern = 'Wild isolate')))]
+
+#### Merging both of the databases
+casted_merged <- merge(growth, casted[, .(strain, wildProp)], by = "strain")
+### Melting the data
+casted_merged <- melt(casted_merged, id.vars = c('strain', 'wildProp'), variable.name = 'env', value.name = 'rate')
+
+
+ggplot(casted_merged, aes(x = wildProp, y=rate)) + geom_point() + theme_minimal() +
+  facet_wrap(~env)
 
 ## PLotting the data points as barplot distributed over environments
 ggplot(growth_geno_melt, aes(x = wildProp, y=rate)) + geom_point() + theme_minimal() +
@@ -173,4 +195,61 @@ ggplot(mean_expr_dt[1:50], aes(gene, 2^mean_expr)) + geom_point(aes(color = medi
 
 #Average expression of each gene type in each environment
 ggplot(mean_expr_dt, aes(gene_type,2^mean_expr)) + geom_boxplot() + facet_wrap(~medium)
+```
+
+
+## Warm Up Exercise
+``` {r echo=TRUE}
+marker <- read.delim("Data/eqtl/marker.txt")
+growth <- read.delim("Data/eqtl/growth.txt")
+genotype <- read.delim("Data/eqtl/genotype.txt")
+
+getMeasure <- function(strt, chr, genotype, growth, df)
+{
+  cols <- which(df$chrom == chr & df$start == strt)
+  
+  if(cols == 1)
+    cols = cols + 1
+  mygeno <- genotype[, cols]
+  
+  # Creating temporary database for Lab strain
+  temp <- as.data.table(melt(growth[mygeno == "Lab strain", ], id.vars = "strain"))
+  med_lab <- temp[, median(value, na.rm = T), by=variable]
+  
+  # Creating temporary database for Wild Isolate
+  temp <- as.data.table(melt(growth[mygeno == "Wild isolate", ], id.vars = "strain"))
+  med_wild <- temp[, median(value, na.rm = T), by=variable]
+  
+  return(med_wild[, V1] - med_lab[, V1])
+  
+}
+
+num_markers <- 1000
+marker_dt <- as.data.table(marker)
+difference <- list()
+
+filtered_markers <- gene_marker_filtered[, .(chrom, id, marker_start)]
+filtered_markers <- unique(filtered_markers)
+num_filtered_markers <-  dim(filtered_markers)[1]
+print(num_filtered_markers)
+
+for(i in 1:num_filtered_markers){
+  
+  c <- as.character(filtered_markers[i, 1]$chrom)
+  s <- as.integer(filtered_markers[i, 3]$marker_start)
+  x <- getMeasure(s, c, genotype, growth, marker)
+  dim(x) <- c(1,5)
+  x <- as.data.table(x)
+  
+  difference <- rbindlist(list(difference, x))
+}
+
+
+difference
+
+colnames(difference) <- colnames(growth)[2:6]
+difference[, mrk_no := c(1:887)]
+ggplot(difference, aes(mrk_no, YPD)) + geom_point() + theme_minimal()
+
+plot(YPMalt ~ mygeno[strain], data=growth)
 ```
