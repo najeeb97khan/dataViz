@@ -17,11 +17,8 @@ library(data.table)
 library(magrittr)
 library(ggplot2)
 library(reshape)
-<<<<<<< HEAD
 library(readxl)
-=======
 library(tidyr)
->>>>>>> 7b041f9bac6123d96f3a9cf2be6e814225fced3d
 ```
 ```{r echo=TRUE}
 genotype_file <- 'Data/eqtl/genotype.txt'
@@ -78,7 +75,6 @@ ggplot(growth_geno_melt, aes(x = wildProp, y=rate)) + geom_point() + theme_minim
 ggplot(growth_geno_melt, aes(x = labProp, y=rate)) + geom_point() + theme_minimal() +
   facet_wrap(~env)
 
-<<<<<<< HEAD
 ## PLotting the data points as a single scatterplot
 ggplot(growth_geno_melt, aes(x = wildProp, y = rate, color=env)) + geom_point() + theme_minimal()
 
@@ -96,17 +92,12 @@ growth_marker_melt[, marker_number := as.integer(gsub("mrk_", "", marker_number)
 
 ### Plotting marker number with the mean of the rate in each of those markers
 growth_marker_melt[, mean_growth_per_marker := mean(rate, na.rm = T), by=marker_number]
-=======
 ```
->>>>>>> 7b041f9bac6123d96f3a9cf2be6e814225fced3d
 
 ### Getting insight into how genes are expressed on different environments
 We investigate how the expression rate of each gene and gene type varies in different environments. 
 
-<<<<<<< HEAD
 ### They will be a straightline because for each segregant there is a single growth => for all 1000 markers there is only a single growth 
-
-```
 
 ### Getting insight into how the gene expression is affected by the environment
 
@@ -122,8 +113,7 @@ gene_data <- read.csv(gene_file, sep = '\t')
 
 ### Merging expression and gene data
 gene_expression_merge <- merge(gene_expression, gene_data)
-
-=======
+```
 ```{r echo=TRUE}
 gene_file <- 'Data/eqtl/gene.txt'
 expression_file <- 'Data/eqtl/expression.txt'
@@ -168,5 +158,4 @@ ggplot(mean_expr_dt[1:50], aes(gene, 2^mean_expr)) + geom_point(aes(color = medi
 
 #Average expression of each gene type in each environment
 ggplot(mean_expr_dt, aes(gene_type,2^mean_expr)) + geom_boxplot() + facet_wrap(~medium)
->>>>>>> 7b041f9bac6123d96f3a9cf2be6e814225fced3d
 ```
