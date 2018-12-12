@@ -95,11 +95,15 @@ There exists multiple number of parent strain in each of the segregants as can b
 ```{r echo=TRUE}
 # Calculating the proportion of Lab strain
 # We walk down each of the segregants and calculate the number of occurences of each strain
-genotype[, labProp := apply(genotype, MARGIN = 1, FUN = function(row) mean(grepl(unname(unlist(row)), pattern = 'Lab strain')))]
+genotype[, labProp := apply(genotype, MARGIN = 1, 
+                            FUN = function(row) mean(grepl(unname(unlist(row)), 
+                                                           pattern = 'Lab strain')))]
 
 # Calculating the proportion of Wild Isolate
 # Same as above except now we do it for the Wild Isolate
-genotype[, wildProp := apply(genotype, MARGIN = 1, FUN = function(row) mean(grepl(unname(unlist(row)), pattern = 'Wild isolate')))]
+genotype[, wildProp := apply(genotype, MARGIN = 1, 
+                             FUN = function(row) mean(grepl(unname(unlist(row)), 
+                                                            pattern = 'Wild isolate')))]
 
 # Merging the two datasets on the basis of segregants
 # We don't need the strain at each marker since we already have the proportion
@@ -253,45 +257,18 @@ ggplot(difference, aes(mrk_no, diff)) + geom_point() +
 
 The above plots show that for each of the medium there does not exist a relation such that there are more number markers with positive difference than negative difference. Thus neither Wild Isolate nor Lab Isolate has an effect over the growth rate which was also depicted by the proportion analysis.
 
-### Determining the dependency of gene expression on environments 
+## Determining the dependency of gene expression on environments 
 We investigate how the expression rate of each gene and gene type varies in different environments. 
 
 ```{r echo=TRUE}
 
 # Mean expression rate of each gene in each environments 
-mean_expr_gene <- unique(expression_tidy[, .(gene_type, mean_expr = .SD[, mean(expression_rate)]), by = c("gene","medium")])
+mean_expr_gene <- unique(expression_tidy[, .(gene_type, 
+                                             mean_expr = .SD[, mean(expression_rate)]), 
+                                         by = c("gene","medium")])
 
-expression_tidy <- gather(expression, medium_strand, expression_rate, c("YPD.seg_01B":"YPMalt.seg_45C"))
-expression_tidy <- as.data.table(expression_tidy)
-expression_tidy[, medium_strand := .(gsub("_", "", medium_strand))]
-head(expression_tidy, n = 10)
-expression_tidy <- as.data.table(separate(as.data.frame(expression_tidy), medium_strand, into = c("medium", "strand")))
-expression_tidy
-
-gene_expr <- unique(expression_tidy[, mean_expr := .SD[, mean(expression_rate)], by = c("gene","medium")])
-
-# Expression rates in each medium
-YDP_expr <- unique(expression_tidy[medium == "YPD", .SD[,.(medium, mean(expression_rate))], by = gene])
-YDPBPS_expr <-unique(expression_tidy[medium == "YPDBPS", .SD[,.(medium, mean(expression_rate))], by = gene])
-YDPRapa_expr <- unique(expression_tidy[medium == "YPDRapa", .SD[,.(medium, mean(expression_rate))], by = gene])
-YPE_expr <- unique(expression_tidy[medium == "YPE", .SD[,.(medium, mean(expression_rate))], by = gene])
-YPMalt_expr <- unique(expression_tidy[medium == "YPMalt", .SD[,.(medium, mean(expression_rate))], by = gene])
-
-ggplot(YDP_expr, aes(gene, V2)) + geom_point()
-ggplot(YDPBPS_expr, aes(gene, V2)) + geom_point()
-ggplot(YDPRapa_expr, aes(gene, V2)) + geom_point()
-ggplot(YPE_expr, aes(gene, V2)) + geom_point()
-ggplot(YPMalt_expr, aes(gene, V2)) + geom_point()
-
-# Average expression of each gene in each medium in one graph
-mean_expr_dt <- unique(gene_expr[,.(medium, mean_expr, gene_type), by=gene])
-ggplot(mean_expr_dt[1:50], aes(gene, mean_expr)) + geom_point(aes(color = medium))
-ggplot(mean_expr_dt[1:50], aes(gene, 2^mean_expr)) + geom_point(aes(color = medium))
-
-# Average expression of each gene type in each environment
-ggplot(mean_expr_dt, aes(gene_type,2^mean_expr)) + geom_boxplot() + facet_wrap(~medium)
-
-diff_expr_gene <- mean_expr_gene[, .(mean_expr, diff_expr = (max(mean_expr) - min(mean_expr)), medium), by=gene]
+diff_expr_gene <- mean_expr_gene[, .(mean_expr, diff_expr = (max(mean_expr) - min(mean_expr)),
+                                     medium), by=gene]
 ordered_genes <- setorder(diff_expr_gene, diff_expr)[, .(gene, diff_expr, medium)]
 ordered_genes <- unique(ordered_genes[, diff_expr, by = gene])
 #the genes that are most environment independent
@@ -314,10 +291,67 @@ ggplot(gene_type_data, aes(gene_type, mean_expr)) + geom_boxplot() + facet_wrap(
 We have seen that regardless of the environment, genes with the ORF-T type are the highest expressed genes. This is partially due to the type of the gene, since ORF type genes are used in translation, it is only logical that they are the most expressed genes.
 
 ## Correlation between genotype and expression rate of a gene
-We have tried to find if a correlation exists between the expression rate of a gene and if the gene comes from a wild or lab isolate.
+We have tried to find if a correlation exists between the expression rate of a gene and if the gene comes from a wild or lab isolate. We have used the same method we used to find the relation between genotype and growthrates to see if a wild isolate or lab strain has a higher expression rate than the other. We again took the differences between the medians of expression rates for a marker for lab strain and wild isolate and plotted the differences for all strains.  
 
 ```{r echo=TRUE}
-#TODO: Change Najeeb's code to calculate differences for each marker for comparing genotypes with expression rate this time
+# Redeclaring the function since the format of data is a bit different for expression and growth
+getMeasureExp <- function(strt, chr, genotype, growth, df)
+{
+  cols <- which(df$chrom == chr & df$start == strt)
+  
+  if(cols == 1)
+    cols = cols + 1
+  mygeno <- genotype[, cols]
+  
+  # Creating temporary database for Lab strain
+  temp <- as.data.table(growth[mygeno == "Lab strain", ])
+  med_lab <- temp[, median(expression_rate, na.rm = T), by=medium]
+  
+  # Creating temporary database for Wild Isolate
+  temp <- as.data.table(growth[mygeno == "Wild isolate", ])
+  med_wild <- temp[, median(expression_rate, na.rm = T), by=medium]
+  
+  return(med_wild[, V1] - med_lab[, V1])
+}
+
+# Making expression_tidy data coherent 
+expression_tidy[, strain := strand]
+expression_tidy[, strand := NULL]
+expression_df = as.data.frame(expression_tidy)
+
+# Reinitialising difference
+difference <- c()
+
+for(i in 1:num_filtered_markers){
+  
+  c <- as.character(filtered_markers[i, 1]$chrom)
+  s <- as.integer(filtered_markers[i, 3]$marker_start)
+  x <- getMeasureExp(s, c, genotype_df, expression_df, marker_df)
+  # The result is a list so convert to a data table for easy exploration
+  dim(x) <- c(1,5)
+  x <- as.data.table(x)
+  
+  difference <- rbindlist(list(difference, x))
+}
+
+# Adding colnames according to the environment
+colnames(difference) <- colnames(growth)[2:6]
+
+# Adding marker number to make table nice
+difference[, mrk_no := c(1:887)]
+
+# Melting and Plotting the differences for each of the environment
+difference <- melt(difference, id.vars="mrk_no", variable.name = "env", value.name = "diff")
+
+ggplot(difference, aes(mrk_no, diff)) + geom_point() +
+  facet_wrap(~env) +
+  theme_minimal() +
+  geom_smooth(method = "lm") +
+  labs(title = "Effect of Genotype on the Expression of the Gene") +
+  xlab("Marker Number") +
+  ylab("Difference of median expression b/w Wild Isolate and Lab Strain")
 ```
+Again our data showed that there is no significant correlation between the genotype and the expression rate and it varies on the genes. So it is possible to say that there are different factors that affect the expression rate of a gene besides the genotype.
 
 #Conclusion
+In this case study we tried to find correlations between the genotype of a gene and the environment and how it affects the expression rate of the gene and therefore the growth rate of the segregant since expression of a gene affects the synthesis of a protein. Our analysis showed us that it is not possible to find a general pattern between the genotype and the expression rate and the growth rate since each gene behaves differently and probably has different factors that affects its expression rate. Also since each gene is expressed differently in different environments, it was not possible to understand which gene plays a key role in the growth of a segregant. However, we found out that the environmental factors have an effect on the growth rate of a segregant although it doesn't affect the expression rate, which might give us an insight on the environment such as the abundancy of food, oxygen etc.
