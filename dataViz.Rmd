@@ -12,6 +12,7 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_knit$set(root.dir = '~/Google Drive/TUM Session/Semester One/Data Visualisation in R/')
 ```
+
 ```{r echo=FALSE, include=FALSE}
 library(data.table)
 library(magrittr)
@@ -21,230 +22,170 @@ library(readxl)
 library(tidyr)
 ```
 #Introduction
-In this case study we have examined the relations between a genome, gene, expression rate and growth rate in a set of yeast segregants and environments. We used the data given to us to answer questions such as the relation between genotype and environment on the growth rate of the yeast, which can also be related to the expression of the genes which result with translation of them and production of proteins. In order to analyze our data, we first tidied each table so that each column has a variable and each row has an observation. We will be presenting the methods we used to tidy the data and the analysis we made.
+In this case study we have examined the relations between a genome, gene, expression rate and growth rate in a set of yeast segregants and environments. We used the data given to us to answer questions such as the relation between genotype and environment on the growth rate of the yeast, which can also be related to the expression of the genes resulting in their translation and production of proteins. In order to analyze our data, we first tidied each table so that each column has a unique type of variable and each row has an observation. We will be presenting the methods we used to tidy the data and the analysis we made in this report.
 
 #Tidying Data
+Methods introduced in the lecture such as melting the data to combine columns that depict the same variable and casting the data to form multiple columns out of a given column are extensively used in for tidying up the data.
+
 ```{r echo=TRUE}
+## Reading Datasets
 gene_file <- 'Data/eqtl/gene.txt'
 expression_file <- 'Data/eqtl/expression.txt'
+genotype_file <-'Data/eqtl/genotype.txt'
+growth_file <- 'Data/eqtl/growth.txt'
+marker_file <- 'Data/eqtl/marker.txt'
+
 gene <- as.data.table(read.delim(gene_file))
 expression <- as.data.table(read.delim(expression_file, comment.char = "#"))
+genotype <- as.data.table(read.delim(genotype_file))
+growth <- as.data.table(read.delim(growth_file))
+marker <- as.data.table(read.delim(marker_file))
 
 name <- gene[,.(name)]
 type <- gene[,.(type)]
 expression[, gene := name][, gene_type := type]
 
-#tidy expression.txt file
+# Tidying expression.txt file
 expression_tidy <- gather(expression, medium_strand, expression_rate, c("YPD.seg_01B":"YPMalt.seg_45C"))
 expression_tidy <- as.data.table(expression_tidy)
 expression_tidy[, medium_strand := .(gsub("_", "", medium_strand))]
 head(expression_tidy, n = 10)
 expression_tidy <- as.data.table(separate(as.data.frame(expression_tidy), medium_strand, into = c("medium", "strand")))
 
-#tidied version of expression data
+# Tidied version of expression data
 head(expression_tidy)
-```
-### Getting Data 
 
-```{r echo=TRUE}
-#TODO: Can you tidy the code here please?
-genotype_file <-'Data/eqtl/genotype.txt'
-growth_file <- 'Data/eqtl/growth.txt'
-gene_file <- 'Data/eqtl/gene.txt'
-marker_file <- 'Data/eqtl/marker.txt'
+# Tidying growth.txt file
+growth_tidy <- melt(growth, id.vars = 'strain', variable.name = 'env', value.name = 'rate')
+head(growth_tidy)
 
-genotype <- as.data.table(read.delim(genotype_file))
-growth <- as.data.table(read.delim(growth_file))
-gene <- as.data.table(read.delim(gene_file))
-marker <- as.data.table(read.delim(marker_file))
+# Tidying genotype.txt file
+names <- c("strain") 
+for(i in 1:1000)
+  names <- c(names, paste("mrk", i, sep = "_"))
+colnames(genotype) <- names
+print(colnames(genotype)[1:10])
 
-```
-
-### Checking the integrity of the data in both of the tables
-
-```{r echo=TRUE}
-## Genotype Data
-#### names <- c("strain")
-#### for(i in 1:1000)
-#### {
-####  names <- c(names, paste("mrk", i, sep = "_"))
-#### }
-#### colnames(genotype) <- names
-
-### Calculating the proportion of Wild Isolate and Lab Strain
-genotype[, labProp := apply(genotype, MARGIN = 1, FUN = function(row) mean(grepl(unname(unlist(row)), pattern = 'Lab strain')))]
-
-genotype[, wildProp := apply(genotype, MARGIN = 1, FUN = function(row) mean(grepl(unname(unlist(row)), pattern = 'Wild isolate')))]
-
-### Checking the column class
-sapply(growth, class)
-
-### Melting the data to make it tidy
-growth_melt <- melt(growth, id.vars = 'strain', variable.name = 'env', value.name = 'rate')
+# Tidying markers.txt file
+marker[, id := colnames(genotype)[2:1001]]
+print(marker[, id][1:10])
 ```
 
+Both `growth.txt` and `expression.txt` contained data points where the value of growth and expression respectively was depicted in different columns. The tables were tidied to the form shown above.
+There exists 1000 markers in the dataset (as can be seen in `markers.txt` as well as `genotype.txt`). The names of the markers were changed so that they have a coherent name ranging from mrk_1 to mrk_1000 
 
 #Analysis
 
-### Effect of Environment on Growth
-We investigate how the environment affect growth rate of the segregants.
+##Effect of Environment on Growth
+We investigate how the environment affect growth rate of the segregants. Since there exists multiple number of segregants, a box plot showing the distribution of the growth of these segregants in different mediums can help us in identifying outliers and which medium has the highest median growth attached to it.
+
 ```{r echo=TRUE}
 # Plotting boxplots to recognize any outliers
-ggplot(growth_melt, aes(env, rate)) + geom_boxplot() + theme_minimal() +
-  labs(title = "Visualisation of Growth Data") +
+ggplot(growth_tidy, aes(env, rate)) + geom_boxplot() + theme_minimal() +
+  labs(title = "Visualisation of Growth Data in different environments") +
   xlab("Environment") +
   ylab("Rate of Growth")
 
 ```
-In the generated box-plot we see that the distribution of the growth rates varies in every environment. Since we have the growth data of the same strain in different environments, the box-plot shows that growth rate is affected by the environment and most of the strains were able to grow more in the environment YPD.
+In the generated box-plot we see that the distribution of the growth rates varies in every environment. Since we have the growth data of the same strain in different environments, the box-plot shows that growth rate is affected by the environment and most of the strains were able to grow more in the environment YPD than any of the other environments.
 
-### Getting insight into how proportion of each parent strain affects the growth
-In this section we investigate how the proportion of parent strain (from Wild Isolate and Lab Strain) is responsible for effecting the growth in a particular medium.
+## Getting insight into how proportion of each parent strain affects the growth
+There exists multiple number of parent strain in each of the segregants as can be observed in genotype.txt table. We devise a single number metric (the proportion of each of the parent strain) and associate it with each of the segregants. Using this metric, in this section we investigate how the proportion of parent strain (from Wild Isolate and Lab Strain) is responsible for effecting the growth in a particular medium.
 
 ```{r echo=TRUE}
-## Merging the two datasets on the basis of segregants
+# Calculating the proportion of Lab strain
+# We walk down each of the segregants and calculate the number of occurences of each strain
+genotype[, labProp := apply(genotype, MARGIN = 1, FUN = function(row) mean(grepl(unname(unlist(row)), pattern = 'Lab strain')))]
+
+# Calculating the proportion of Wild Isolate
+# Same as above except now we do it for the Wild Isolate
+genotype[, wildProp := apply(genotype, MARGIN = 1, FUN = function(row) mean(grepl(unname(unlist(row)), pattern = 'Wild isolate')))]
+
+# Merging the two datasets on the basis of segregants
+# We don't need the strain at each marker since we already have the proportion
 growth_geno <- merge(genotype[, c(1, 1002, 1003)], growth)
 
+# Melting the merged table to make it tidy and easy to plot
+growth_geno_melt <- melt(growth_geno, id.vars = c('strain', 'labProp', 'wildProp'), variable.name = 'env', value.name = 'rate')
+
+# PLotting the data points as scatter distributed over environments
+ggplot(growth_geno_melt, aes(x = wildProp, y=rate)) + geom_point() + theme_minimal() +
+  facet_wrap(~env) +
+  geom_smooth(method = 'lm') +
+  labs(title = 'Effect of parent strain and growth in different environments') +
+  xlab('Proportion of Wild Isolate in segregant') +
+  ylab('Growth Rate')
+
+ggplot(growth_geno_melt, aes(x = labProp, y=rate)) + geom_point() + theme_minimal() +
+  facet_wrap(~env) +
+  geom_smooth(method = 'lm') +
+  labs(title = 'Effect of parent strain and growth in different environments') +
+  xlab('Proportion of Lab Isolate in segregant') +
+  ylab('Growth Rate')
+
+```
+In the above plots it can be observed that as the proportion of Wild isolate or Lab Strain increases there is not any considerable change in the rate of growth in different media. We can filter out some of the markers and change the proportion by getting only those markers that have a gene between them. All those markers that does not have a gene between them can be discarded. We perform this analysis in the following session: 
+
+```{r echo=TRUE}
+
+# Finding those markers that have a gene between them either completely or partially
 gene_marker <- merge(marker,gene,by = "chrom",allow.cartesian = T)
 setnames(gene_marker,"start.x", "marker_start")
 setnames(gene_marker,"start.y", "gene_start")
 setnames(gene_marker,"end.x", "marker_end")
 setnames(gene_marker,"end.y", "gene_end")
-
-## Melting the merged table
-growth_geno_melt <- melt(growth_geno, id.vars = c('strain', 'labProp', 'wildProp'), variable.name = 'env', value.name = 'rate')
-
-##Finding those markers which are on gene either completely or partially
 gene_marker_filtered <- subset(gene_marker,!(marker_start > gene_end | marker_end < gene_start))
+head(gene_marker_filtered, n=2)
+```
+We have determined the markers which contains one or more gene by checking the indices of markers and genes and the ones that overlapped has those genes contained in them. The genotype through these genes can be used for analysing the growth and also expression.
 
-## TODO: Find the type of strain on each of the genes that are expressed through the marker
-colnames(genotype)
-
+```{r echo=TRUE}
+# Melting genotype data
 genotype_melt <- melt(genotype, id.vars="strain", variable.name = "id", value.name = "parent_strain")
-
-new_table <- merge(x = genotype_melt, y = gene_marker_filtered, by = "id", allow.cartesian = T)
-subset_new_table <- new_table[, .(id, strain, parent_strain)]
-subset_new_table <- unique(subset_new_table)
-
-casted <- dcast(subset_new_table, ... ~ id, value.var =  "parent_strain")
-
-casted[, wildProp := apply(casted, MARGIN = 1, FUN = function(row) mean(grepl(unname(unlist(row)), pattern = 'Wild isolate')))]
-
-#### Merging both of the databases
-casted_merged <- merge(growth, casted[, .(strain, wildProp)], by = "strain")
-### Melting the data
-casted_merged <- melt(casted_merged, id.vars = c('strain', 'wildProp'), variable.name = 'env', value.name = 'rate')
-
-
-ggplot(casted_merged, aes(x = wildProp, y=rate)) + geom_point() + theme_minimal() +
-  facet_wrap(~env)
-
-## PLotting the data points as barplot distributed over environments
-ggplot(growth_geno_melt, aes(x = wildProp, y=rate)) + geom_point() + theme_minimal() +
-  facet_wrap(~env)
-
-ggplot(growth_geno_melt, aes(x = labProp, y=rate)) + geom_point() + theme_minimal() +
-  facet_wrap(~env)
-
-## PLotting the data points as a single scatterplot
-ggplot(growth_geno_melt, aes(x = wildProp, y = rate, color=env)) + geom_point() + theme_minimal()
-
-## Growth and Marker plots
-
-### Merging growth and genotype data with markers
-growth_marker <- merge(genotype, growth)
-growth_marker_melt <- melt(growth_marker, id.vars = colnames(growth_marker)[1:1003], variable.name = "env", value.name="rate")
-
-### Melting the markers in one column to make data tidy
-growth_marker_melt <- melt(growth_marker_melt, id.vars = c("strain", "env", "rate", "labProp", "wildProp"), variable.name = "marker_number", value.name = "parent_strain")
-
-### Cleaning the marker number column
-growth_marker_melt[, marker_number := as.integer(gsub("mrk_", "", marker_number))]
-
-### Plotting marker number with the mean of the rate in each of those markers
-growth_marker_melt[, mean_growth_per_marker := mean(rate, na.rm = T), by=marker_number]
 ```
 
-We have calculated the percentage of lab and wild strains of each segregant to observe if a segregant with a majority of a certain genotype has a higher growth rate in a specific environment. Our findings showed that in none of the environments, we couldn???t observe a relation between increasing genotype percentage and growth rate. We were expecting to get such a result since we know each gene has a different expression rate and just by knowing the proportion of a genotype, we cannot be able to conclude the effect of it on the growth rate. Therefore, in the next part we will be examining relation between gene expression and growth rate with respect to whether the genotype of a each strain effects its expression rate.
-
-### Getting insight into how proportion of each parent strain affects the growth
-In this section we determined the markers which represent one or more genes.
+The melting is performed to filter the genotype table with filtered markers table. For each of strain there exists 1000 markers. We filter the genotype table such that only those markers that are present in the filtered table are present in the filtered table.
 
 ```{r echo=TRUE}
-#TODO: Swaraj's code that matches markes and genes goes HERE
-```
-We have determined the markers which contains one or more gene by checking the indices of markers and genes and the ones that overlapped has the genes. Therefore we were able to determine the genotype of a gene and we were able to use these in our analysis of growth and expression rates.
+# Subsetting the table
+filtered_genotype <- subset(genotype_melt, id %in% unique(gene_marker_filtered[, id]))
 
-### Investigating the genotype affect on the growth rate of a segregant
-In this section we used the markers that corespond to a gene to check if the genotype of the genes affect the growth rate
+# Casting it back into the form to count proportions of each different type of parent strain
+filtered_genotype <- dcast(filtered_genotype, ... ~ id, value.var =  "parent_strain")
+
+# Counting proportions and plotting
+# We do it only for wild isolate because the proportions are correlated
+# Lab isolate = 1 - wild isolate (in proportion)
+filtered_genotype[, wildProp := apply(filtered_genotype, MARGIN = 1, FUN = function(row) mean(grepl(unname(unlist(row)), pattern = 'Wild isolate')))]
+
+# Merging with the growth
+filtered_genotype <- merge(growth, filtered_genotype[, .(strain, wildProp)], by = "strain")
+
+# Melting the data
+filtered_genotype <- melt(filtered_genotype, id.vars = c('strain', 'wildProp'), variable.name = 'env', value.name = 'rate')
+
+# PLotting the data points as scatter distributed over environments
+ggplot(filtered_genotype, aes(x = wildProp, y=rate)) + geom_point() + theme_minimal() +
+  facet_wrap(~env) +
+  geom_smooth(method = 'lm') +
+  labs(title = 'Effect of parent strain and growth in different environments') +
+  xlab('Proportion of Wild Isolate in segregant') +
+  ylab('Growth Rate')
+```
+
+From the plots it can be observed that there is no significant change in the relation between the proportion of Wild Isolate and growth rate in different medium. The growth rate does not seem to be affected by how much of Wild Isolate and Lab strain is present in a given segregant.
+
+In the above analysis, we calculated the percentage of lab and wild strains of each segregant to observe if a segregant with a majority of a certain genotype has a higher growth rate in a specific environment. Our findings showed that in none of the environments, there exists a relation between increasing genotype percentage (of either type) and growth rate. Since each gene has a different expression rate and just by knowing the proportion of a genotype, it cannot be concluded that it has any effect on the growth rate.
+
+In the next part we will be examining the relation between gene expression and growth rate with respect to whether the genotype of a each strain effects its expression rate.
+
+## Investigating the genotype affect on the growth rate of a segregant
+In this section we employ a different strategy for finding out whether a particular type of genotype has effect on the growth. We calculate the median difference between growth rate of Wild Isolate and Lab strain at each marker position and check whether the markers have positive or negative difference.
+If there exists more markers with a positive difference, then it is safe to assume that the Wild Isolate has more growth rate as compared to Lab isolate and vice versa.
+
 ```{r echo=TRUE}
-#TODO: Najeeb's code that calculates differences for each marker for comparing genotypes
-```
-
-### Determining the dependency of gene expression on environments 
-We investigate how the expression rate of each gene and gene type varies in different environments. 
-
-### They will be a straightline because for each segregant there is a single growth => for all 1000 markers there is only a single growth 
-
-### Getting insight into how the gene expression is affected by the environment
-
-```{r echo=True}
-### Getting the gene expression  and gene data as they are connected
-gene_expression_file <- 'Data/eqtl/expression.txt'
-gene_expression <- as.data.table(read.table(gene_expression_file), keep.rownames = T)
-colnames(gene_expression) <- as.character(gene_expression[1, ])
-unname(gene_expression)
-
-gene_file <- 'Data/eqtl/gene.txt'
-gene_data <- read.csv(gene_file, sep = '\t')
-
-### Merging expression and gene data
-gene_expression_merge <- merge(gene_expression, gene_data)
-```
-```{r echo=TRUE}
-
-#mean expression rate of each gene in each environments 
-mean_expr_gene <- unique(expression_tidy[, .(gene_type, mean_expr = .SD[, mean(expression_rate)]), by = c("gene","medium")])
-
-<<<<<<< HEAD
-expression_tidy <- gather(expression, medium_strand, expression_rate, c("YPD.seg_01B":"YPMalt.seg_45C"))
-expression_tidy <- as.data.table(expression_tidy)
-expression_tidy[, medium_strand := .(gsub("_", "", medium_strand))]
-head(expression_tidy, n = 10)
-expression_tidy <- as.data.table(separate(as.data.frame(expression_tidy), medium_strand, into = c("medium", "strand")))
-expression_tidy
-
-gene_expr <- unique(expression_tidy[, mean_expr := .SD[, mean(expression_rate)], by = c("gene","medium")])
-
-#expression rates in each medium
-YDP_expr <- unique(expression_tidy[medium == "YPD", .SD[,.(medium, mean(expression_rate))], by = gene])
-YDPBPS_expr <-unique(expression_tidy[medium == "YPDBPS", .SD[,.(medium, mean(expression_rate))], by = gene])
-YDPRapa_expr <- unique(expression_tidy[medium == "YPDRapa", .SD[,.(medium, mean(expression_rate))], by = gene])
-YPE_expr <- unique(expression_tidy[medium == "YPE", .SD[,.(medium, mean(expression_rate))], by = gene])
-YPMalt_expr <- unique(expression_tidy[medium == "YPMalt", .SD[,.(medium, mean(expression_rate))], by = gene])
-
-ggplot(YDP_expr, aes(gene, V2)) + geom_point()
-ggplot(YDPBPS_expr, aes(gene, V2)) + geom_point()
-ggplot(YDPRapa_expr, aes(gene, V2)) + geom_point()
-ggplot(YPE_expr, aes(gene, V2)) + geom_point()
-ggplot(YPMalt_expr, aes(gene, V2)) + geom_point()
-
-#average expression of each gene in each medium in one graph
-mean_expr_dt <- unique(gene_expr[,.(medium, mean_expr, gene_type), by=gene])
-ggplot(mean_expr_dt[1:50], aes(gene, mean_expr)) + geom_point(aes(color = medium))
-ggplot(mean_expr_dt[1:50], aes(gene, 2^mean_expr)) + geom_point(aes(color = medium))
-
-#Average expression of each gene type in each environment
-ggplot(mean_expr_dt, aes(gene_type,2^mean_expr)) + geom_boxplot() + facet_wrap(~medium)
-```
-
-
-## Warm Up Exercise
-``` {r echo=TRUE}
-marker <- read.delim("Data/eqtl/marker.txt")
-growth <- read.delim("Data/eqtl/growth.txt")
-genotype <- read.delim("Data/eqtl/genotype.txt")
-
+# Function for finding out the difference of median growth for both strain
+# The function also calculates these values in different environment
 getMeasure <- function(strt, chr, genotype, growth, df)
 {
   cols <- which(df$chrom == chr & df$start == strt)
@@ -262,39 +203,94 @@ getMeasure <- function(strt, chr, genotype, growth, df)
   med_wild <- temp[, median(value, na.rm = T), by=variable]
   
   return(med_wild[, V1] - med_lab[, V1])
-  
 }
 
-num_markers <- 1000
-marker_dt <- as.data.table(marker)
+# We have extended the implementation of Warm Up Exercise which expects data frame
+genotype_df <- as.data.frame(genotype)
+growth_df <- as.data.frame(growth)
+marker_df <- as.data.frame(marker)
 difference <- list()
 
-filtered_markers <- gene_marker_filtered[, .(chrom, id, marker_start)]
-filtered_markers <- unique(filtered_markers)
+# Operating only over those markers that have a gene on them
+filtered_markers <- unique(gene_marker_filtered[, .(chrom, id, marker_start)])
 num_filtered_markers <-  dim(filtered_markers)[1]
-print(num_filtered_markers)
 
+# There can exist a more optimized implementation but this is more explanatory
 for(i in 1:num_filtered_markers){
   
   c <- as.character(filtered_markers[i, 1]$chrom)
   s <- as.integer(filtered_markers[i, 3]$marker_start)
-  x <- getMeasure(s, c, genotype, growth, marker)
+  x <- getMeasure(s, c, genotype_df, growth_df, marker_df)
+  
+  # The result is a list so convert to a data table for easy exploration
   dim(x) <- c(1,5)
   x <- as.data.table(x)
   
   difference <- rbindlist(list(difference, x))
+  
+  # Phew! That was a long one.
 }
 
-
-difference
-
+# Adding colnames according to the environment
 colnames(difference) <- colnames(growth)[2:6]
-difference[, mrk_no := c(1:887)]
-ggplot(difference, aes(mrk_no, YPD)) + geom_point() + theme_minimal()
 
-plot(YPMalt ~ mygeno[strain], data=growth)
+# Adding marker number to make table nice
+difference[, mrk_no := c(1:887)]
+print(head(difference, n=2))
+
+# Melting and Plotting the differences for each of the environment
+difference <- melt(difference, id.vars="mrk_no", variable.name = "env", value.name = "diff")
+print(head(difference, n=2))
+
+ggplot(difference, aes(mrk_no, diff)) + geom_point() +
+  facet_wrap(~env) +
+  theme_minimal() +
+  geom_smooth(method = "lm") +
+  labs(title = "Difference between median growth of Wild Isolate and Lab strain for each marker.") +
+  xlab("Marker Number") +
+  ylab("Difference of median growth b/w Wild Isolate and Lab Strain")
 ```
-=======
+
+The above plots show that for each of the medium there does not exist a relation such that there are more number markers with positive difference than negative difference. Thus neither Wild Isolate nor Lab Isolate has an effect over the growth rate which was also depicted by the proportion analysis.
+
+### Determining the dependency of gene expression on environments 
+We investigate how the expression rate of each gene and gene type varies in different environments. 
+
+```{r echo=TRUE}
+
+# Mean expression rate of each gene in each environments 
+mean_expr_gene <- unique(expression_tidy[, .(gene_type, mean_expr = .SD[, mean(expression_rate)]), by = c("gene","medium")])
+
+expression_tidy <- gather(expression, medium_strand, expression_rate, c("YPD.seg_01B":"YPMalt.seg_45C"))
+expression_tidy <- as.data.table(expression_tidy)
+expression_tidy[, medium_strand := .(gsub("_", "", medium_strand))]
+head(expression_tidy, n = 10)
+expression_tidy <- as.data.table(separate(as.data.frame(expression_tidy), medium_strand, into = c("medium", "strand")))
+expression_tidy
+
+gene_expr <- unique(expression_tidy[, mean_expr := .SD[, mean(expression_rate)], by = c("gene","medium")])
+
+# Expression rates in each medium
+YDP_expr <- unique(expression_tidy[medium == "YPD", .SD[,.(medium, mean(expression_rate))], by = gene])
+YDPBPS_expr <-unique(expression_tidy[medium == "YPDBPS", .SD[,.(medium, mean(expression_rate))], by = gene])
+YDPRapa_expr <- unique(expression_tidy[medium == "YPDRapa", .SD[,.(medium, mean(expression_rate))], by = gene])
+YPE_expr <- unique(expression_tidy[medium == "YPE", .SD[,.(medium, mean(expression_rate))], by = gene])
+YPMalt_expr <- unique(expression_tidy[medium == "YPMalt", .SD[,.(medium, mean(expression_rate))], by = gene])
+
+ggplot(YDP_expr, aes(gene, V2)) + geom_point()
+ggplot(YDPBPS_expr, aes(gene, V2)) + geom_point()
+ggplot(YDPRapa_expr, aes(gene, V2)) + geom_point()
+ggplot(YPE_expr, aes(gene, V2)) + geom_point()
+ggplot(YPMalt_expr, aes(gene, V2)) + geom_point()
+
+# Average expression of each gene in each medium in one graph
+mean_expr_dt <- unique(gene_expr[,.(medium, mean_expr, gene_type), by=gene])
+ggplot(mean_expr_dt[1:50], aes(gene, mean_expr)) + geom_point(aes(color = medium))
+ggplot(mean_expr_dt[1:50], aes(gene, 2^mean_expr)) + geom_point(aes(color = medium))
+
+# Average expression of each gene type in each environment
+ggplot(mean_expr_dt, aes(gene_type,2^mean_expr)) + geom_boxplot() + facet_wrap(~medium)
+
 diff_expr_gene <- mean_expr_gene[, .(mean_expr, diff_expr = (max(mean_expr) - min(mean_expr)), medium), by=gene]
 ordered_genes <- setorder(diff_expr_gene, diff_expr)[, .(gene, diff_expr, medium)]
 ordered_genes <- unique(ordered_genes[, diff_expr, by = gene])
@@ -306,18 +302,18 @@ tail(ordered_genes, n=3)[,gene]
 
 We have calculated differences between each gene's mean expression rate for each environment. We assumed that the gene with the lowest difference is the one that is not dependent on the environment since the expression rate is nearly the same at each environment. So we have ordered all genes to find out which genes are less dependent on the environment. We found out that the genes YML035C, YLR035C, YPR029C are the ones that are least depent ones and the genes YNL117W, YMR107W, YJR005C-A are the most dependant ones on the environment.
 
-### Understanding the affect of the type of the gene on the expression rate
+## Understanding the affect of the type of the gene on the expression rate
 In this section we examined how the different types of genes defer in expression rate in different environments.
 
 ```{r echo=TRUE}
-#Expression rate of each type of genes in each environment
+# Expression rate of each type of genes in each environment
 gene_type_data <- unique(mean_expr_gene[,.(medium, mean_expr, gene_type), by=gene])
 ggplot(gene_type_data, aes(gene_type, mean_expr)) + geom_boxplot() + facet_wrap(~medium) 
 ```
 
 We have seen that regardless of the environment, genes with the ORF-T type are the highest expressed genes. This is partially due to the type of the gene, since ORF type genes are used in translation, it is only logical that they are the most expressed genes.
 
-### Correlation between genotype and expression rate of a gene
+## Correlation between genotype and expression rate of a gene
 We have tried to find if a correlation exists between the expression rate of a gene and if the gene comes from a wild or lab isolate.
 
 ```{r echo=TRUE}
